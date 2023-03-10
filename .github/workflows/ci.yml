@@ -1,0 +1,36 @@
+name: CI
+run-name: Zola blog deployment
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: deploy
+    steps:
+      - name: Checkout the current branch
+        uses: actions/checkout@v3
+
+      - name: Initialize the ssh-agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Install Zola
+        run: sudo snap install zola --edge
+
+      - name: Build the website
+        run: zola build
+
+      - name: Scan the host key
+        run: mkdir -p ~/.ssh/ && ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts
+        env:
+          DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
+
+      - name: Deploy the website
+        run: >-
+          ssh $DEPLOY_USERNAME@$DEPLOY_SERVER rm -rf ./* &&
+          sftp $DEPLOY_USERNAME@$DEPLOY_SERVER:./ <<< $'put -r public/*'
+        env:
+          DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
+          DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
